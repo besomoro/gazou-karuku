@@ -45,6 +45,10 @@ select,input[type=number]{padding:8px;border-radius:8px;border:1px solid var(--b
 .sum{font-size:14px;margin:8px 0}
 .note{font-size:12px;color:var(--sub);line-height:1.6}
 progress{width:100%;height:8px}
+.where{background:color-mix(in srgb,var(--pri) 10%,transparent);border-radius:10px;padding:10px;font-size:13px;line-height:1.6;margin-bottom:8px}
+.toast{position:fixed;left:12px;right:12px;bottom:calc(80px + env(safe-area-inset-bottom));background:#111827;color:#fff;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.6;z-index:9;box-shadow:0 6px 20px #0005;display:none}
+.toast.on{display:block}
+.toast b{color:#93c5fd}
 </style>
 </head>
 <body>
@@ -78,10 +82,14 @@ progress{width:100%;height:8px}
     <h2>結果</h2>
     <progress id="prog" value="0" max="1"></progress>
     <div class="sum" id="resSum"></div>
+    <div class="where">📁 <b>保存先：</b>内部ストレージ ＞ <b>Download</b>（ダウンロード）フォルダ<br>
+      ファイル名は「元の名前_small.jpg」（ZIPは「images_日付.zip」）です。<br>
+      見つけ方：「Files」「ファイル」アプリ ＞ ダウンロード、またはギャラリー/Googleフォトの「Download」アルバム</div>
     <div class="list" id="list"></div>
   </div>
 </main>
 
+<div class="toast" id="toast"></div>
 <div class="bar">
   <button class="btn" id="run" disabled>縮小する</button>
   <button class="btn sub" id="share" disabled>共有</button>
@@ -187,7 +195,11 @@ $('#run').addEventListener('click',async()=>{
 function download(blob,name){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name||blob.name;
   document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  showToast(`保存しました：<b>${esc(a.download)}</b><br>📁 保存先：内部ストレージ ＞ <b>Download</b> フォルダ`);
 }
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let toastT;
+function showToast(html){const t=$('#toast');t.innerHTML=html;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),6000);t.onclick=()=>t.classList.remove('on')}
 
 $('#share').addEventListener('click',async()=>{
   const fs=results.map(r=>r.file);
