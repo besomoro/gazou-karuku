@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>画像かるく</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--fg:#1f2937;--sub:#6b7280;--pri:#2563eb;--pri2:#1d4ed8;--ok:#059669;--ng:#dc2626;--bd:#e5e7eb}
+@media (prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#1e293b;--fg:#e5e7eb;--sub:#94a3b8;--bd:#334155}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--fg);padding:0 0 120px}
+header{background:var(--pri);color:#fff;padding:14px 16px;font-weight:700;font-size:18px;position:sticky;top:0;z-index:5}
+header small{font-weight:400;opacity:.85;font-size:12px;margin-left:6px}
+main{padding:12px;max-width:720px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+h2{font-size:15px;margin:0 0 10px}
+.pick{display:block;text-align:center;padding:22px;border:2px dashed var(--pri);border-radius:12px;color:var(--pri);font-weight:700;cursor:pointer}
+.pick input{display:none}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg label{flex:1 1 45%;border:1px solid var(--bd);border-radius:10px;padding:10px;font-size:14px;cursor:pointer}
+.seg input{margin-right:6px}
+.seg label:has(input:checked){border-color:var(--pri);background:color-mix(in srgb,var(--pri) 10%,transparent)}
+.seg .desc{display:block;color:var(--sub);font-size:12px;margin-top:2px}
+.row{display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap}
+.row>span:first-child{min-width:90px;font-size:14px}
+input[type=range]{flex:1}
+select,input[type=number]{padding:8px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg);font-size:15px}
+.opt{display:none}.opt.on{display:block}
+.btn{border:0;border-radius:10px;padding:12px 14px;font-size:15px;font-weight:700;cursor:pointer;background:var(--pri);color:#fff}
+.btn.sub{background:transparent;color:var(--pri);border:1px solid var(--pri)}
+.btn:disabled{opacity:.45}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:5}
+.bar .btn{flex:1}
+.list{display:grid;gap:8px}
+.item{display:flex;gap:10px;align-items:center;border:1px solid var(--bd);border-radius:10px;padding:8px}
+.item img{width:56px;height:56px;object-fit:cover;border-radius:6px;background:var(--bd)}
+.item .info{flex:1;min-width:0;font-size:13px}
+.item .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.item .meta{color:var(--sub)}
+.item .ok{color:var(--ok);font-weight:700}.item .ng{color:var(--ng)}
+.item button{border:0;background:none;color:var(--pri);font-size:20px;padding:6px;cursor:pointer}
+.sum{font-size:14px;margin:8px 0}
+.note{font-size:12px;color:var(--sub);line-height:1.6}
+progress{width:100%;height:8px}
+</style>
+</head>
+<body>
+<header>画像かるく<small>端末内だけで画像を縮小</small></header>
+<main>
+  <div class="card">
+    <label class="pick">＋ 画像を選ぶ（複数可）
+      <input id="file" type="file" accept="image/*" multiple>
+    </label>
+    <div class="sum" id="pickSum"></div>
+  </div>
+
+  <div class="card">
+    <h2>縮小方法</h2>
+    <div class="seg" id="modes">
+      <label><input type="radio" name="mode" value="rec" checked>おすすめ<span class="desc">長辺1920px・画質80%（チャット送信向け）</span></label>
+      <label><input type="radio" name="mode" value="px">長辺ピクセル指定<span class="desc">大きさを指定してリサイズ</span></label>
+      <label><input type="radio" name="mode" value="q">画質指定<span class="desc">解像度はそのまま圧縮率だけ調整</span></label>
+      <label><input type="radio" name="mode" value="kb">目標サイズ指定<span class="desc">指定KB以下になるよう自動調整</span></label>
+    </div>
+    <div class="opt" id="opt-px"><div class="row"><span>長辺</span>
+      <select id="px"><option>640</option><option>1024</option><option selected>1280</option><option>1600</option><option>1920</option><option>2560</option></select> px</div></div>
+    <div class="opt" id="opt-q"><div class="row"><span>画質</span><input type="range" id="q" min="30" max="95" value="75"><b id="qv">75%</b></div></div>
+    <div class="opt" id="opt-kb"><div class="row"><span>目標サイズ</span><input type="number" id="kb" value="500" min="30" step="50" style="width:100px"> KB以下</div></div>
+    <div class="row"><span>出力形式</span>
+      <select id="fmt"><option value="image/jpeg" selected>JPEG（推奨・互換性◎）</option><option value="image/webp">WebP（より小さい）</option><option value="image/png">PNG（劣化なし・大きめ）</option></select></div>
+    <p class="note">※ 保存時に位置情報（GPS）・撮影日時などのExif情報は自動で削除されます。画像の向きは正しく補正されます。<br>※ 画像は端末の外へ送信されません。</p>
+  </div>
+
+  <div class="card" id="resCard" hidden>
+    <h2>結果</h2>
+    <progress id="prog" value="0" max="1"></progress>
+    <div class="sum" id="resSum"></div>
+    <div class="list" id="list"></div>
+  </div>
+</main>
+
+<div class="bar">
+  <button class="btn" id="run" disabled>縮小する</button>
+  <button class="btn sub" id="share" disabled>共有</button>
+  <button class="btn sub" id="zip" disabled>ZIP保存</button>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+let files=[],results=[];
+const fmtSize=b=>b<1024*1024?(b/1024).toFixed(0)+'KB':(b/1048576).toFixed(2)+'MB';
+const ext={'image/jpeg':'jpg','image/webp':'webp','image/png':'png'};
+
+// 設定の記憶
+const saved=(()=>{try{return JSON.parse(localStorage.getItem('kk-set')||'{}')}catch(e){return{}}})();
+for(const k of ['px','q','kb','fmt'])if(saved[k])$('#'+k).value=saved[k];
+if(saved.mode){const r=document.querySelector(`input[name=mode][value=${saved.mode}]`);if(r)r.checked=true}
+function mode(){return document.querySelector('input[name=mode]:checked').value}
+function syncUI(){
+  for(const m of ['px','q','kb'])$('#opt-'+m).classList.toggle('on',mode()===m);
+  $('#qv').textContent=$('#q').value+'%';
+  const fmtPng=$('#fmt').value==='image/png';
+  try{localStorage.setItem('kk-set',JSON.stringify({mode:mode(),px:$('#px').value,q:$('#q').value,kb:$('#kb').value,fmt:$('#fmt').value}))}catch(e){}
+}
+document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',syncUI));syncUI();
+
+$('#file').addEventListener('change',e=>{
+  files=[...e.target.files];
+  const total=files.reduce((a,f)=>a+f.size,0);
+  $('#pickSum').textContent=files.length?`${files.length}枚選択中（合計 ${fmtSize(total)}）`:'';
+  $('#run').disabled=!files.length;
+});
+
+async function loadBitmap(file){
+  try{return await createImageBitmap(file,{imageOrientation:'from-image'})}
+  catch(e){
+    const url=URL.createObjectURL(file);
+    try{const img=new Image();img.src=url;await img.decode();return img}
+    finally{setTimeout(()=>URL.revokeObjectURL(url),1000)}
+  }
+}
+function encode(src,w,h,type,q){
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const g=c.getContext('2d');
+  if(type==='image/jpeg'){g.fillStyle='#fff';g.fillRect(0,0,w,h)}
+  g.imageSmoothingQuality='high';g.drawImage(src,0,0,w,h);
+  return new Promise((res,rej)=>c.toBlob(b=>{c.width=c.height=0;b?res(b):rej(new Error('変換失敗'))},type,q));
+}
+function fit(w,h,max){const s=Math.min(1,max/Math.max(w,h));return[Math.round(w*s),Math.round(h*s)]}
+
+async function compress(file){
+  const src=await loadBitmap(file);
+  const W=src.width||src.naturalWidth,H=src.height||src.naturalHeight;
+  const type=$('#fmt').value,m=mode();
+  let blob,w=W,h=H;
+  if(m==='rec'){[w,h]=fit(W,H,1920);blob=await encode(src,w,h,type,.8)}
+  else if(m==='px'){[w,h]=fit(W,H,+$('#px').value);blob=await encode(src,w,h,type,.85)}
+  else if(m==='q'){blob=await encode(src,w,h,type,$('#q').value/100)}
+  else{
+    const target=Math.max(10,+$('#kb').value)*1024;
+    [w,h]=fit(W,H,4096);
+    for(let i=0;i<12;i++){
+      if(type==='image/png'){blob=await encode(src,w,h,type);}
+      else{
+        let lo=.4,hi=.92,best=null;
+        for(let j=0;j<6;j++){const mid=(lo+hi)/2;const b=await encode(src,w,h,type,mid);
+          if(b.size<=target){best=b;lo=mid}else hi=mid}
+        blob=best||await encode(src,w,h,type,.4);
+      }
+      if(blob.size<=target||Math.max(w,h)<200)break;
+      w=Math.round(w*.8);h=Math.round(h*.8);
+    }
+  }
+  if(src.close)src.close();
+  const base=file.name.replace(/\.[^.]+$/,'')||'image';
+  return{file:new File([blob],`${base}_small.${ext[type]}`,{type,lastModified:Date.now()}),w,h,W,H};
+}
+
+$('#run').addEventListener('click',async()=>{
+  $('#run').disabled=$('#share').disabled=$('#zip').disabled=true;
+  results.forEach(r=>r.url&&URL.revokeObjectURL(r.url));results=[];
+  $('#resCard').hidden=false;$('#list').innerHTML='';
+  const prog=$('#prog');prog.max=files.length;prog.value=0;
+  let before=0,after=0,fail=0;
+  for(const f of files){
+    const el=document.createElement('div');el.className='item';
+    el.innerHTML=`<img alt=""><div class="info"><div class="name"></div><div class="meta">処理中…</div></div>`;
+    el.querySelector('.name').textContent=f.name;$('#list').append(el);
+    try{
+      const r=await compress(f);r.url=URL.createObjectURL(r.file);results.push(r);
+      before+=f.size;after+=r.file.size;
+      el.querySelector('img').src=r.url;
+      const pct=Math.round((1-r.file.size/f.size)*100);
+      el.querySelector('.meta').innerHTML=`${fmtSize(f.size)} → <span class="ok">${fmtSize(r.file.size)}</span>（${pct>=0?'-'+pct:'+'+(-pct)}%）<br>${r.W}×${r.H} → ${r.w}×${r.h}`;
+      const b=document.createElement('button');b.textContent='⤓';b.title='保存';b.onclick=()=>download(r.file);el.append(b);
+    }catch(e){fail++;el.querySelector('.meta').innerHTML=`<span class="ng">読み込めない形式です（${e.message}）</span>`}
+    prog.value++;
+    await new Promise(r=>setTimeout(r));
+  }
+  $('#resSum').textContent=`${results.length}枚完了${fail?`・${fail}枚失敗`:''}　合計 ${fmtSize(before)} → ${fmtSize(after)}`;
+  $('#run').disabled=false;$('#share').disabled=$('#zip').disabled=!results.length;
+});
+
+function download(blob,name){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name||blob.name;
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+
+$('#share').addEventListener('click',async()=>{
+  const fs=results.map(r=>r.file);
+  if(navigator.canShare&&navigator.canShare({files:fs})){
+    try{await navigator.share({files:fs})}catch(e){if(e.name!=='AbortError')alert('共有に失敗しました: '+e.message)}
+  }else{alert('この端末/ブラウザはファイル共有に未対応です。個別保存かZIP保存をご利用ください。')}
+});
+
+// ---- 無圧縮ZIP（画像は既に圧縮済みのためSTOREで十分） ----
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c}return t})();
+function crc32(u){let c=-1;for(let i=0;i<u.length;i++)c=CRC[(c^u[i])&255]^(c>>>8);return(c^-1)>>>0}
+async function makeZip(list){
+  const enc=new TextEncoder(),parts=[],central=[];let off=0;const used=new Set();
+  const d=new Date(),dt=((d.getFullYear()-1980)<<25)|((d.getMonth()+1)<<21)|(d.getDate()<<16)|(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);
+  for(const f of list){
+    let name=f.name,i=1;while(used.has(name))name=f.name.replace(/(\.\w+)$/,`(${i++})$1`);used.add(name);
+    const data=new Uint8Array(await f.arrayBuffer()),nb=enc.encode(name),crc=crc32(data);
+    const h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);
+    h.setUint32(10,dt,true);h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,nb.length,true);
+    parts.push(h,nb,data);
+    const c=new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);
+    c.setUint32(12,dt,true);c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+    central.push(c,nb);off+=30+nb.length+data.length;
+  }
+  const csize=central.reduce((a,p)=>a+p.byteLength,0),e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,list.length,true);e.setUint16(10,list.length,true);e.setUint32(12,csize,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...central,e],{type:'application/zip'});
+}
+$('#zip').addEventListener('click',async()=>{
+  const z=await makeZip(results.map(r=>r.file));
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  download(z,`images_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.zip`);
+});
+
+if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
